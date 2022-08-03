@@ -2301,17 +2301,24 @@ EOF
 
 ![containerd service](./images/configure-containerd.PNG)
 
+
 ![proxy service](./images/kube-proxy-status.PNG)
+
 
 ![proxy service](./images/kube-proxy-status-troubleshooting.PNG)
 
+
 ![proxy service](./images/kube-proxy-status-running.PNG)
+
 
 ![proxy service](./images/kube-proxy-status-running2.PNG)
 
+
 ![kubelet service](./images/kubelet-blocker.PNG)
 
+
 ![kubelet service](./images/status-kubelet-failure.PNG)
+
 
 Now you should have the worker nodes joined to the cluster, and in a READY state.
 
