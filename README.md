@@ -2146,7 +2146,6 @@ Install CNI into /opt/cni/bin/
 
 ```
 sudo tar -xvf cni-plugins-linux-amd64-v1.3.0.tgz -C /opt/cni/bin/
-cni-plugins-linux-amd64-v1.3.0.tgz
 ```
 The output shows the plugins that comes with the CNI.
 
