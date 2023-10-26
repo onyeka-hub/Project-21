@@ -93,7 +93,7 @@ For a better understanding of each aspect of spinning up a Kubernetes cluster, w
 To successfully implement "K8s From-Ground-Up", the following and even more will be done by you as a K8s administrator:
 
 1. Install and configure master (also known as control plane) components and worker nodes (or just nodes).
-2.Apply security settings across the entire cluster (i.e., encrypting the data in transit, and at rest)
+2. Apply security settings across the entire cluster (i.e., encrypting the data in transit, and at rest)
     - In transit encryption means encrypting communications over the network using HTTPS
     - At rest encryption means encrypting the data stored on a disk
 3. Plan the capacity for the backend data store etcd
@@ -117,17 +117,17 @@ Tools to be used and expected result of the Project 20
 - cfssl and cfssljson utilities
 - Kubernetes cluster
 
-You will create 3 EC2 Instances, and in the end, we will have the following parts of the cluster properly configured:
+You will create 6 EC2 Instances, and in the end, we will have the following parts of the cluster properly configured:
 
-- One Kubernetes Master
-- Two Kubernetes Worker Nodes
+- Three Kubernetes Master
+- Three Kubernetes Worker Nodes
 - Configured SSL/TLS certificates for Kubernetes components to communicate securely
 - Configured Node Network
 - Configured Pod Network
 
 ## STEP 0-INSTALL CLIENT TOOLS BEFORE BOOTSTRAPPING THE CLUSTER.
 
-First, you will need some client tools installed and configurations made on your client workstation:
+First, you will need some client tools installed and configurations made on your client workstation **(wsl ubuntu 20.04)**:
 
 - awscli – is a unified tool to manage your AWS services
 - kubectl – this command line utility will be your main control tool to manage your K8s cluster. You will use this tool so many times, so you will be able to type ‘kubetcl’ on your keyboard with a speed of light. You can always make a shortcut (alias) to just one character ‘k’. Also, add this extremely useful official kubectl Cheat Sheet to your bookmarks, it has examples of the most used ‘kubectl’ commands.
@@ -136,11 +136,18 @@ First, you will need some client tools installed and configurations made on your
 
 #### Install and configure AWS CLI
 
-Configure AWS CLI to access all AWS services used, for this you need to have a user with programmatic access keys configured in AWS Identity and Access Management (IAM):
+On your local workstation **(wsl ubuntu 20.04)** download and install the latest version of AWS CLI
+
+To install awscli on your ubuntu local system:
+```
+sudo apt update
+sudo apt install awscli -y
+sudo apt install jq -y
+```
+
+Configure AWS CLI to access all AWS services used, for this you need to have a user with programmatic access keys configured in AWS Identity and Access Management (IAM).
 
 Generate access keys and store them in a safe place.
-
-On your local workstation download and install the latest version of AWS CLI
 
 To configure your AWS CLI – run your shell (or cmd if using Windows) and run:
 
@@ -151,6 +158,7 @@ AWS Secret Access Key [None]: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
 Default region name [None]: us-west-2
 Default output format [None]: json
 ```
+aws configure --profile %onyi%
 
 Test your AWS CLI by running:
 
@@ -165,6 +173,8 @@ and check if you can see VPC details.
 Kubernetes cluster has a Web API that can receive HTTP/HTTPS requests, but it is quite cumbersome to curl an API each and every time you need to send some command, so kubectl command tool was developed to ease a K8s administrator’s life.
 
 With this tool you can easily interact with Kubernetes to deploy applications, inspect and manage cluster resources, view logs and perform many more administrative operations.
+
+Because I had already installed on my windows system, my wsl ubuntu can pick it up and I dont need to install it again on the ubuntu.
 
 ### Installing kubectl
 
@@ -199,38 +209,47 @@ Output:
     Client Version: version.Info{Major:"1", Minor:"20+", GitVersion:"v1.20.4-dirty", GitCommit:"e87da0bd6e03ec3fea7933c4b5263d151aafd07c", GitTreeState:"dirty", BuildDate:"2021-03-15T10:03:32Z", GoVersion:"go1.16.2", Compiler:"gc", Platform:"darwin/amd64"}
 ```
 
-#### Install CFSSL and CFSSLJSON
+#### Install CFSSL and CFSSLJSON-linux
 
 cfssl is an open source tool by Cloudflare used to setup a Public Key Infrastructure (PKI Infrastructure) for generating, signing and bundling TLS certificates. In previous projects you have experienced the use of Letsencrypt for the similar use case. Here, cfssl will be configured as a Certificate Authority which will issue the certificates required to spin up a Kubernetes cluster.
 
 Download, install and verify successful installation of cfssl and cfssljson:
 
-#### Install CFSSL and CFSSLJSON
-
-#### Install CFSSL and CFSSLJSON-linux
-
 ```
 wget -q --show-progress --https-only --timestamping \
-  https://storage.googleapis.com/kubernetes-the-hard-way/cfssl/1.4.1/linux/cfssl \
-  https://storage.googleapis.com/kubernetes-the-hard-way/cfssl/1.4.1/linux/cfssljson
+  https://pkg.cfssl.org/R1.2/cfssl_linux-amd64 \
+  https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
 ```
 
 ```
-chmod +x cfssl cfssljson
+chmod +x cfssl_linux-amd64 cfssljson_linux-amd64
+sudo mv cfssl_linux-amd64 /usr/local/bin/cfssl
+sudo mv cfssljson_linux-amd64 /usr/local/bin/cfssljson
+```
 
-sudo mv cfssl cfssljson /usr/local/bin/
+Verification. Verify cfssl version 1.2.0 or higher is installed:
+```
+cfssl version
+```
+
+Output
+```
+Version: 1.2.0
+Revision: dev
+Runtime: go1.6
 ```
 
 #### Install CFSSL and CFSSLJSON-mac
 
 ```
-curl -o cfssl https://storage.googleapis.com/kubernetes-the-hard-way/cfssl/1.4.1/darwin/cfssl
-curl -o cfssljson https://storage.googleapis.com/kubernetes-the-hard-way/cfssl/1.4.1/darwin/cfssljson
-chmod +x cfssl cfssljson
+curl -o cfssl https://pkg.cfssl.org/R1.2/cfssl_linux-amd64 
+curl -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
+chmod +x cfssl_linux-amd64 cfssljson_linux-amd64
 ```
 
 ```
-sudo mv cfssl cfssljson /usr/local/bin/
+sudo mv cfssl_linux-amd64 /usr/local/bin/cfssl
+sudo mv cfssljson_linux-amd64 /usr/local/bin/cfssljson
 ```
 
 If you have issues using the binaries directly, you should consider using the package manager Homebrew and that might be a better option:
@@ -268,6 +287,10 @@ As we already know, we need some machines to run the control plane and the worke
 
 1. Create a directory named k8s-cluster-from-ground-up
 
+```
+mkdir k8s-cluster-from-ground-up
+```
+
 2. Create a VPC and store the ID as a variable:
 
 ```
@@ -281,7 +304,9 @@ VPC_ID=$(aws ec2 create-vpc \
 
 ```
 NAME=k8s-cluster-from-ground-up
+```
 
+```
 aws ec2 create-tags \
   --resources ${VPC_ID} \
   --tags Key=Name,Value=${NAME}
@@ -437,7 +462,7 @@ aws ec2 authorize-security-group-ingress \
     --group-id ${SECURITY_GROUP_ID} \
     --ip-permissions IpProtocol=tcp,FromPort=2379,ToPort=2380,IpRanges='[{CidrIp=172.31.0.0/24}]'
 
-# # Create Inbound traffic for all communication within the subnet to connect on ports used by the worker nodes
+# Create Inbound traffic for all communication within the subnet to connect on ports used by the worker nodes
 aws ec2 authorize-security-group-ingress \
     --group-id ${SECURITY_GROUP_ID} \
     --ip-permissions IpProtocol=tcp,FromPort=30000,ToPort=32767,IpRanges='[{CidrIp=172.31.0.0/24}]'
@@ -530,9 +555,12 @@ IMAGE_ID=$(aws ec2 describe-images --owners 099720109477 \
   --filters \
   'Name=root-device-type,Values=ebs' \
   'Name=architecture,Values=x86_64' \
-  'Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-*' \
+  'Name=name,Values=ubuntu-pro-server/images/hvm-ssd/ubuntu-xenial-16.04-amd64-pro-server-20221202' \
   | jq -r '.Images|sort_by(.Name)[-1]|.ImageId')
 ```
+ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-*
+
+ubuntu-pro-server/images/hvm-ssd/ubuntu-xenial-16.04-amd64-pro-server-20221202
 
 ### SSH key-pair
 
@@ -804,7 +832,6 @@ cfssl gencert \
 2. kube-scheduler Client Certificate and Private Key
 ```
 {
-
 cat > kube-scheduler-csr.json <<EOF
 {
   "CN": "system:kube-scheduler",
@@ -913,7 +940,7 @@ cfssl gencert \
 
 Similar to how you configured the api-server's certificate, Kubernetes requires that the hostname of each worker node is included in the client certificate.
 
-Also, Kubernetes uses a special-purpose authorization mode called Node Authorizer, that specifically authorizes API requests made by kubelet services. In order to be authorized by the Node Authorizer, kubelets must use a credential that identifies them as being in the system:nodes group, with a username of system:node:<nodeName>. Notice the "CN": "system:node:${instance_hostname}", in the below code.
+Also, Kubernetes uses a special-purpose authorization mode called Node Authorizer, that specifically authorizes API requests made by kubelet services. In order to be authorized by the Node Authorizer, kubelets must use a credential that identifies them as being in the system:nodes group, with a username of system:node:{nodeName}. Notice the "CN": "system:node:${instance_hostname}", in the below code.
 
 Therefore, the certificate to be created must comply to these requirements. In the below example, there are 3 worker nodes, hence we will use bash to loop through a list of the worker nodes’ hostnames, and based on each index, the respective Certificate Signing Request (CSR), private key and client certificates will be generated.
 
@@ -990,7 +1017,7 @@ cfssl gencert \
 }
 ```
 
-7. Actually, we are not done yet! :tired_face:
+7. Actually, we are not done yet!
 
 There is one more pair of certificate and private key we need to generate. That is for the Token Controller: a part of the Kubernetes Controller Manager kube-controller-manager responsible for generating and signing service account tokens which are used by pods or other resources to establish connectivity to the api-server. Read more about Service Accounts from the official documentation.
 
@@ -1043,9 +1070,12 @@ Copy these files securely to the worker nodes using scp utility
 
 scp for securely transfer files from one machine to another has the same format as ssh command
 
+```
 ssh -i <path to private key pair> <host machine username>@<host IP>
 
 scp -i <path to private key pair> file1 file2 file3 <host machine username>@<host IP>:~/;
+```
+
 where ~/ is the choice directory where you want to send your files, in this case is the home directory 
 
 ```
@@ -1115,7 +1145,7 @@ master-kubernetes.pem                                                           
 master-kubernetes-key.pem
 ```
 
-![worker nodes files](./images/scp-master-node.PNG)
+![master nodes files](./images/scp-master-node.PNG)
 
 The kube-proxy, kube-controller-manager, kube-scheduler, and kubelet client certificates will be used to generate client authentication configuration files later.
 
@@ -1135,7 +1165,9 @@ KUBERNETES_API_SERVER_ADDRESS=$(aws elbv2 describe-load-balancers --load-balance
 
 1. Generate the kubelet kubeconfig file
 
-For each of the nodes running the kubelet component, it is very important that the client certificate configured for that node is used to generate the kubeconfig. This is because each certificate has the node’s DNS name or IP Address configured at the time the certificate was generated. It will also ensure that the appropriate authorization is applied to that node through the Node Authorizer
+For each of the nodes running the kubelet component, it is very important that the client certificate configured for that node is used to generate the kubeconfig. This is because each certificate has the node’s DNS name or IP Address configured at the time the certificate was generated. It will also ensure that the appropriate authorization is applied to that node through the Node Authorizer.
+
+Each kubeconfig outside of the master nodes like the kubelet, kube-proxy and admin requires a Kubernetes API Server to connect to while the ones within the control nodes just need to connect with the localhost (loop back) address. To support high availability the IP address assigned to the external load balancer fronting the Kubernetes API Servers will be used.
 
 Below command must be run in the directory where all the certificates were generated.
 
@@ -1217,14 +1249,16 @@ Open up the kubeconfig files generated and review the 3 different sections that 
 - Credentials
 - And Kube Context
 
-Kubeconfig file is used to organize information about clusters, users, namespaces and authentication mechanisms. By default, kubectl looks for a file named config in the $HOME/.kube directory. You can specify other kubeconfig files by setting the KUBECONFIG environment variable or by setting the --kubeconfig flag. To get to know more how to create your own kubeconfig files – read this documentation.
+Kubeconfig file is used to organize information about clusters, users, namespaces and authentication mechanisms. By default, kubectl looks for a file named **config** in the $HOME/.kube directory. You can specify other kubeconfig files by setting the KUBECONFIG environment variable or by setting the --kubeconfig flag. To get to know more how to create your own kubeconfig files – read this documentation - https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/.
 
 Context part of kubeconfig file defines three main parameters: cluster, namespace and user. You can save several different contexts with any convenient names and switch between them when needed.
 
 ```
 kubectl config use-context %context-name%
 ```
+
 2. Generate the kube-proxy kubeconfig
+
 ```
 {
   kubectl config set-cluster ${NAME} \
@@ -1301,6 +1335,12 @@ Notice that the --server is set to use 127.0.0.1. This is because, this componen
 ```
 
 5. Finally, generate the kubeconfig file for the admin user
+
+Configuring kubectl for Remote Access
+
+In this lab you will generate a kubeconfig file for the kubectl command line utility based on the admin user credentials.
+
+The Admin Kubernetes Configuration File: Each kubeconfig requires a Kubernetes API Server to connect to. To support high availability the IP address assigned to the external load balancer fronting the Kubernetes API Servers will be used.
 
 ```
 {
@@ -1397,6 +1437,17 @@ EOF
 
 Send the encryption file to the Controller nodes using scp and a for loop.
 
+```
+for i in 0 1 2; do
+instance="${NAME}-master-${i}" \
+  external_ip=$(aws ec2 describe-instances \
+    --filters "Name=tag:Name,Values=${instance}" \
+    --output text --query 'Reservations[].Instances[].PublicIpAddress')
+  scp -i ../ssh/${NAME}.id_rsa \
+    encryption-config.yaml ubuntu@${external_ip}:~/;
+done
+```
+
 ### Bootstrap etcd cluster
 
 **TIPS**: Use a terminal multi-plexer like multi-tabbed putty or tmux to work with multiple terminal sessions simultaneously. It will make your life easier, especially when you need to work on multiple nodes and run the same command across all nodes. Imagine repeating the same commands on 10 different nodes, and you don not intend to start automating with a configuration management tool like Ansible yet.
@@ -1433,16 +1484,17 @@ ssh -i k8s-cluster-from-ground-up.id_rsa ubuntu@${master_3_ip}
 
 2. Download and install etcd
 
-```  wget -q --show-progress --https-only --timestamping \
-  "https://github.com/etcd-io/etcd/releases/download/v3.4.15/etcd-v3.4.15-linux-amd64.tar.gz"
+```
+wget -q --show-progress --https-only --timestamping \
+  "https://github.com/etcd-io/etcd/releases/download/v3.4.27/etcd-v3.4.27-linux-amd64.tar.gz"
 ```
 
 3. Extract and install the etcd server and the etcdctl command line utility:
 
 ```
 {
-tar -xvf etcd-v3.4.15-linux-amd64.tar.gz
-sudo mv etcd-v3.4.15-linux-amd64/etcd* /usr/local/bin/
+tar -xvf etcd-v3.4.27-linux-amd64.tar.gz
+sudo mv etcd-v3.4.27-linux-amd64/etcd* /usr/local/bin/
 }
 ```
 
@@ -1584,6 +1636,7 @@ encryption-config.yaml /var/lib/kubernetes/
 ```
 
 The instance internal IP address will be used to advertise the API Server to members of the cluster. Retrieve the internal IP address for the current compute instance:
+
 ```
 export INTERNAL_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
 ```
@@ -1638,16 +1691,20 @@ EOF
 5. Configure the Kubernetes Controller Manager:
 
 Move the kube-controller-manager kubeconfig into place:
+
 ```
 sudo mv kube-controller-manager.kubeconfig /var/lib/kubernetes/
 ```
+
 Export some variables to retrieve the vpc_cidr – This will be required for the bind-address flag:
+
 ```
 export AWS_METADATA="http://169.254.169.254/latest/meta-data"
 export EC2_MAC_ADDRESS=$(curl -s $AWS_METADATA/network/interfaces/macs/ | head -n1 | tr -d '/')
 export VPC_CIDR=$(curl -s $AWS_METADATA/network/interfaces/macs/$EC2_MAC_ADDRESS/vpc-ipv4-cidr-block/)
 export NAME=k8s-cluster-from-ground-up
 ```
+
 Create the kube-controller-manager.service systemd unit file:
 
 ```
@@ -1683,11 +1740,14 @@ EOF
 6. Configure the Kubernetes Scheduler:
 
 Move the kube-scheduler kubeconfig into place:
+
 ```
 sudo mv kube-scheduler.kubeconfig /var/lib/kubernetes/
 sudo mkdir -p /etc/kubernetes/config
 ```
+
 Create the kube-scheduler.yaml configuration file:
+
 ```
 cat <<EOF | sudo tee /etc/kubernetes/config/kube-scheduler.yaml
 apiVersion: kubescheduler.config.k8s.io/v1beta1
@@ -1698,7 +1758,9 @@ leaderElection:
   leaderElect: true
 EOF
 ```
+
 Create the kube-scheduler.service systemd unit file:
+
 ```
 cat <<EOF | sudo tee /etc/systemd/system/kube-scheduler.service
 [Unit]
@@ -1716,9 +1778,11 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 ```
+
 ![schedular service systemd](./images/kube-schedular-service-systemd.PNG)
 
 7. Start the Controller Services
+
 ```
 {
 sudo systemctl daemon-reload
@@ -1729,11 +1793,11 @@ sudo systemctl start kube-apiserver kube-controller-manager kube-scheduler
 
 Check the status of the services. Start with the kube-scheduler and kube-controller-manager. It may take up to 20 seconds for kube-apiserver to be fully loaded.
 
-{
+```
 sudo systemctl status kube-apiserver
 sudo systemctl status kube-controller-manager
 sudo systemctl status kube-scheduler
-}
+```
 
 ![controller](./images/kube-controller-manager-service.PNG)
 
@@ -1744,22 +1808,27 @@ sudo systemctl status kube-scheduler
 TEST THAT EVERYTHING IS WORKING FINE
 
 1. To get the cluster details run:
+
 ```
 kubectl cluster-info  --kubeconfig admin.kubeconfig
 ```
+
 OUTPUT:
 
 ![cluster info](./images/kubectl-cluster-info.PNG)
 
 2. To get the current namespaces:
+
 ```
 kubectl get namespaces --kubeconfig admin.kubeconfig
 ```
+
 OUTPUT:
 
 ![namespace](./images/namespaces.PNG)
 
 3. To reach the Kubernetes API Server publicly
+
 ```
 curl --cacert /var/lib/kubernetes/ca.pem https://$INTERNAL_IP:6443/version
 ```
@@ -1768,14 +1837,17 @@ OUTPUT:
 ![api server publickly](./images/api-sever-publickly.PNG)
 
 4. To get the status of each component:
+
 ```
 kubectl get componentstatuses --kubeconfig admin.kubeconfig
 ```
+
 ![components status](./images/component-status.PNG)
 
 5. On one of the controller nodes, configure Role Based Access Control (RBAC) so that the api-server has necessary authorization for for the kubelet.
 
 Create the ClusterRole:
+
 ```
 cat <<EOF | kubectl apply --kubeconfig admin.kubeconfig -f -
 apiVersion: rbac.authorization.k8s.io/v1
@@ -1819,8 +1891,6 @@ subjects:
     name: kubernetes
 EOF
 ```
-
-### CONFIGURING THE KUBERNETES WORKER NODES
 
 Before we begin to bootstrap the worker nodes, it is important to understand that the K8s API Server authenticates to the kubelet as the kubernetes user using the same kubernetes.pem certificate.
 
@@ -1874,8 +1944,9 @@ subjects:
     name: kubernetes
 EOF
 ```
+### CONFIGURING THE KUBERNETES WORKER NODES
 
-#### Bootstraping components on the worker nodes
+Bootstraping components on the worker nodes
 
 The following components will be installed on each node:
 
@@ -1893,6 +1964,7 @@ The following components will be installed on each node:
     --output text --query 'Reservations[].Instances[].PublicIpAddress')
     ssh -i k8s-cluster-from-ground-up.id_rsa ubuntu@${worker_1_ip}
 ```
+
 - Worker-2
 ```
     worker_2_ip=$(aws ec2 describe-instances \
@@ -1900,6 +1972,7 @@ The following components will be installed on each node:
     --output text --query 'Reservations[].Instances[].PublicIpAddress')
     ssh -i k8s-cluster-from-ground-up.id_rsa ubuntu@${worker_2_ip}
 ```
+
 - Worker-3
 ```
     worker_3_ip=$(aws ec2 describe-instances \
@@ -1907,7 +1980,9 @@ The following components will be installed on each node:
     --output text --query 'Reservations[].Instances[].PublicIpAddress')
     ssh -i k8s-cluster-from-ground-up.id_rsa ubuntu@${worker_3_ip}
 ```
+
 3. Install OS dependencies:
+
 ```
 {
   sudo apt-get update
@@ -1927,6 +2002,7 @@ The following components will be installed on each node:
 ### QUICK OVERVIEW OF KUBERNETES NETWORK POLICY AND HOW IT IS IMPLEMENTED
 
 Kubernetes network policies are application centric compared to infrastructure/network centric standard firewalls. There are no explicit CIDR or IP used for matching source or destination IP’s. Network policies build up on labels and selectors which are key concepts of Kubernetes that are used for proper organization (for e.g dedicating a namespace to data layer and controlling which app is able to connect there). A typical network policy that controls who can connect to the database namespace will look like below:
+
 ```
 apiVersion: extensions/v1beta1
 kind: NetworkPolicy
@@ -1949,19 +2025,24 @@ spec:
      - protocol: tcp
      port: 3306
 ```
+
 **NOTE**: Best practice is to use solutions like RDS for database implementation. So the above is just to help you understand the concept.
 
 3. Disable Swap
-If swap) is not disabled, kubelet will not start. It is highly recommended to allow Kubernetes to handle resource allocation.
+If swap is not disabled, kubelet will not start. It is highly recommended to allow Kubernetes to handle resource allocation.
 
 Test if swap is already enabled on the host:
+
 ```
 sudo swapon --show
 ```
+
 If there is no output, then you are good to go. Otherwise, run below command to turn it off
+
 ```
 sudo swapoff -a
 ```
+
 4. Download and install a container runtime. (Docker Or Containerd)
 
 Before you install any container runtime, you need to understand that Docker is now deprecated, and Kubernetes no longer supports the Dockershim codebase from v1.20 release
@@ -1972,26 +2053,31 @@ NOTE: Do not install docker and containerd on the same machine, you will have to
 
 Containerd
 Download binaries for runc, cri-ctl, and containerd
+
 ```
- wget https://github.com/opencontainers/runc/releases/download/v1.0.0-rc93/runc.amd64 \
-  https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.21.0/crictl-v1.21.0-linux-amd64.tar.gz \
-  https://github.com/containerd/containerd/releases/download/v1.4.4/containerd-1.4.4-linux-amd64.tar.gz 
+ wget https://github.com/opencontainers/runc/releases/download/v1.1.9/runc.amd64 \
+    https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.28.0/crictl-v1.28.0-linux-amd64.tar.gz \
+    https://github.com/containerd/containerd/releases/download/v1.7.7/containerd-1.7.7-linux-amd64.tar.gz 
 ```
+
 Configure containerd:
+
 ```
 {
   mkdir containerd
-  tar -xvf crictl-v1.21.0-linux-amd64.tar.gz
-  tar -xvf containerd-1.4.4-linux-amd64.tar.gz -C containerd
+  tar -xvf crictl-v1.28.0-linux-amd64.tar.gz
+  tar -xvf containerd-1.7.7-linux-amd64.tar.gz -C containerd
   sudo mv runc.amd64 runc
   chmod +x  crictl runc  
   sudo mv crictl runc /usr/local/bin/
   sudo mv containerd/bin/* /bin/
 }
 ```
+
 ```
 sudo mkdir -p /etc/containerd/
 ```
+
 ```
 cat << EOF | sudo tee /etc/containerd/config.toml
 [plugins]
@@ -2003,7 +2089,9 @@ cat << EOF | sudo tee /etc/containerd/config.toml
       runtime_root = ""
 EOF
 ```
+
 Create the containerd.service systemd unit file:
+
 ```
 cat <<EOF | sudo tee /etc/systemd/system/containerd.service
 [Unit]
@@ -2030,6 +2118,7 @@ EOF
 ![containerd service systemd](./images/containerd-service-systemd.PNG)
 
 5. Create directories for to configure kubelet, kube-proxy, cni, and a directory to keep the kubernetes root ca file:
+
 ```
 sudo mkdir -p \
   /var/lib/kubelet \
@@ -2047,14 +2136,17 @@ CNI (Container Network Interface), a Cloud Native Computing Foundation project, 
 Kubernetes uses CNI as an interface between network providers and Kubernetes Pod networking. Network providers create network plugin that can be used to implement the Kubernetes networking, and includes additional set of rich features that Kubernetes does not provide out of the box.
 
 Download the plugins available from containernetworking’s GitHub repo and read more about CNIs and why it is being developed.
+
 ```
 wget -q --show-progress --https-only --timestamping \
-  https://github.com/containernetworking/plugins/releases/download/v0.9.1/cni-plugins-linux-amd64-v0.9.1.tgz
+  https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-amd64-v1.3.0.tgz
 ```
 
 Install CNI into /opt/cni/bin/
+
 ```
-sudo tar -xvf cni-plugins-linux-amd64-v0.9.1.tgz -C /opt/cni/bin/
+sudo tar -xvf cni-plugins-linux-amd64-v1.3.0.tgz -C /opt/cni/bin/
+cni-plugins-linux-amd64-v1.3.0.tgz
 ```
 The output shows the plugins that comes with the CNI.
 
@@ -2068,19 +2160,21 @@ Click to read more about each of the network plugins below:
 - Weave Net
 - flannel
 
-
 source
 
 Sometimes you can combine more than one plugin together to maximize the use of features from different providers. Or simply use a CNI network provider such as canal that gives you the best of Flannel and Calico.
 
 7. Download binaries for kubectl, kube-proxy, and kubelet
+
 ```
 wget -q --show-progress --https-only --timestamping \
   https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kubectl \
   https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kube-proxy \
   https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kubelet
 ```
+
 8. Install the downloaded binaries
+
 ```
 {
   chmod +x  kubectl kube-proxy kubelet  
@@ -2098,11 +2192,13 @@ In the home directory, you should have the certificates and kubeconfig file for 
 Configuring the network
 
 Get the POD_CIDR that will be used as part of network configuration
+
 ```
 POD_CIDR=$(curl -s http://169.254.169.254/latest/user-data/ \
   | tr "|" "\n" | grep "^pod-cidr" | cut -d"=" -f2)
 echo "${POD_CIDR}"
 ```
+
 In case you are wondering where this POD_CIDR is coming from. Well, this was configured at the time of creating the worker nodes. Remember the for loop below? The --user-data flag is where we specified what we want the POD_CIDR to be. It is very important to ensure that the CIDR does not overlap with EC2 IPs within the subnet. In the real world, this will be decided in collaboration with the Network team.
 
 Why do we need a network plugin? And why network configuration is crucial to implementing a Kubernetes cluster?
@@ -2118,6 +2214,7 @@ To really understand Kubernetes further, let us explore some basic concepts arou
 Pods:
 
 A Pod is the basic building block of Kubernetes; it is the smallest and simplest unit in the Kubernetes object model that you create or deploy. A Pod represents a running process on your cluster.
+
 It encapsulates a container running an application such as the Tooling website (or, in some cases, multiple containers), storage resources, a unique network IP, and options that govern how the container(s) should run. All the containers running inside a Pod can reach each other on localhost.
 
 For example, if you deploy both Tooling and MySQL containers inside the same pod, then both of them are considered running on localhost. Although this design pattern is not ideal. Most likely they will run in separate Pods. In most cases one Pod contains just one container, but there are some design patterns that imply multi-container pods (e.g. sidecar, ambassador, adapter) – you can read more about them in this article https://betterprogramming.pub/understanding-kubernetes-multi-container-pod-patterns-577f74690aee.
@@ -2138,6 +2235,7 @@ You must decide on the Pod CIDR per worker node. Each worker node will run multi
 
 10. Configure the bridge and loopback networks
 Bridge:
+
 ```
 cat > 172-20-bridge.conf <<EOF
 {
@@ -2157,7 +2255,9 @@ cat > 172-20-bridge.conf <<EOF
 }
 EOF
 ```
+
 Loopback:
+
 ```
 cat > 99-loopback.conf <<EOF
 {
@@ -2168,31 +2268,39 @@ EOF
 ```
 
 11. Move the files to the network configuration directory:
+
 ```
 sudo mv 172-20-bridge.conf 99-loopback.conf /etc/cni/net.d/
 ```
+
 12. Store the worker’s name in a variable:
+
 ```
 NAME=k8s-cluster-from-ground-up
 WORKER_NAME=${NAME}-$(curl -s http://169.254.169.254/latest/user-data/ \
   | tr "|" "\n" | grep "^name" | cut -d"=" -f2)
 echo "${WORKER_NAME}"
 ```
+
 13. Move the certificates and kubeconfig file to their respective configuration directories:
+
 ```
 sudo mv ${WORKER_NAME}-key.pem ${WORKER_NAME}.pem /var/lib/kubelet/
 sudo mv ${WORKER_NAME}.kubeconfig /var/lib/kubelet/kubeconfig
 sudo mv kube-proxy.kubeconfig /var/lib/kube-proxy/kubeconfig
 sudo mv ca.pem /var/lib/kubernetes/
 ```
+
 14. Create the kubelet-config.yaml file
 Ensure the needed variables exist:
+
 ```
 NAME=k8s-cluster-from-ground-up
 WORKER_NAME=${NAME}-$(curl -s http://169.254.169.254/latest/user-data/ \
   | tr "|" "\n" | grep "^name" | cut -d"=" -f2)
 echo "${WORKER_NAME}"
 ```
+
 ```
 cat <<EOF | sudo tee /var/lib/kubelet/kubelet-config.yaml
 kind: KubeletConfiguration
@@ -2215,7 +2323,9 @@ tlsCertFile: "/var/lib/kubelet/${WORKER_NAME}.pem"
 tlsPrivateKeyFile: "/var/lib/kubelet/${WORKER_NAME}-key.pem"
 EOF
 ```
+
 ![kubelet config yml file](./images/kubelrt-config-yaml.PNG)
+
 ### FINAL STEPS
 
 Let us talk about the configuration file kubelet-config.yaml and the actual configuration for a bit. Before creating the systemd file for kubelet, it is recommended to create the kubelet-config.yaml and set the configuration there rather than using multiple startup flags in systemd. You will simply point to the yaml file.
@@ -2260,7 +2370,9 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 ```
+
 ![kubelet systemd](./images/kubelet-systemd-service.PNG)
+
 16. Create the kube-proxy.yaml file
 
 ```
@@ -2275,6 +2387,7 @@ EOF
 ```
 
 17. Configure the Kube Proxy systemd service
+
 ```
 cat <<EOF | sudo tee /etc/systemd/system/kube-proxy.service
 [Unit]
@@ -2291,6 +2404,7 @@ EOF
 ```
 
 18. Reload configurations and start both services
+
 ```
 {
   sudo systemctl daemon-reload
@@ -2299,32 +2413,51 @@ EOF
 }
 ```
 
-![containerd service](./images/configure-containerd.PNG)
+![containerd service](./images/containerd-service-systemd2.PNG)
 
 
-![proxy service](./images/kube-proxy-status.PNG)
+![kube-proxy service](./images/kube-proxy-systemd2.PNG)
 
 
-![proxy service](./images/kube-proxy-status-troubleshooting.PNG)
-
-
-![proxy service](./images/kube-proxy-status-running.PNG)
-
-
-![proxy service](./images/kube-proxy-status-running2.PNG)
-
-
-![kubelet service](./images/kubelet-blocker.PNG)
-
-
-![kubelet service](./images/status-kubelet-failure.PNG)
-
+![kubelet service](./images/kubelet-systemd-service2.PNG)
 
 Now you should have the worker nodes joined to the cluster, and in a READY state.
 
+## Verification
+
+Login to one of the controller nodes:
+
+List the registered Kubernetes nodes:
+
+```
+kubectl get nodes --kubeconfig admin.kubeconfig
+```
+
+![nodes status](./images/worker-node-ready.PNG)
+
+From your local system, from the same directory used to generate the admin client certificates ca-authority or you can specify the absolute path of your admin.kubeconfig:
+
+
+```
+kubectl get nodes --kubeconfig admin.kubeconfig
+kubectl get componentstatuses --kubeconfig admin.kubeconfig
+kubectl cluster-info --kubeconfig admin.kubeconfig
+kubectl run nginx --image=nginx --kubeconfig admin.kubeconfig
+kubectl get po --kubeconfig admin.kubeconfig
+```
+
+![cluster status](./images/cluster-status.PNG)
+
+![cluster info](./images/cluster-info.PNG)
 
 
 Troubleshooting Tips: If you have issues at this point. Consider the below:
 
-Use journalctl -u <service name> to get the log output and read what might be wrong with starting up the service. You can redirect the output into a file and analyse it.
-Review your PKI setup again. Ensure that the certificates you generated have the hostnames properly configured.
+1. Use journalctl -u {service name} to get the log output and read what might be wrong with starting up the service. You can redirect the output into a file and analyse it.
+
+2. Review your PKI setup again. Ensure that the certificates you generated have the hostnames properly configured.
+
+Congratulations!
+
+I have created my first Kubernetes cluster From-Ground-Up! It was not an easy task, but I have learned how different components of K8s work together – it will help not just in creating the clusters in the real work experience, but also to maintain and troubleshoot them further.
+
