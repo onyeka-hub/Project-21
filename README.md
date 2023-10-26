@@ -2461,3 +2461,6 @@ Congratulations!
 
 I have created my first Kubernetes cluster From-Ground-Up! It was not an easy task, but I have learned how different components of K8s work together – it will help not just in creating the clusters in the real work experience, but also to maintain and troubleshoot them further.
 
+## Reference
+
+https://petermd.github.io/kubernetes-the-hard-way/
