@@ -1,0 +1,15 @@
+export AWS_PROFILE=onyeka
+NAME=k8s-cluster-from-ground-up
+VPC_ID=vpc-0e90e028ac0229a2f
+AWS_REGION=us-east-2
+DHCP_OPTION_SET_ID=dopt-07f983a884a418b09
+SUBNET_ID=subnet-041b7dce326ba843f
+INTERNET_GATEWAY_ID=igw-0989d107e9c69a590
+ROUTE_TABLE_ID=rtb-03d579db5786dd1f0
+SECURITY_GROUP_ID=sg-01ffc59c92ee20149
+LOAD_BALANCER_ARN=arn:aws:elasticloadbalancing:us-east-2:938106001005:loadbalancer/net/k8s-cluster-from-ground-up/d7aa8222ba1bd0d9
+TARGET_GROUP_ARN=arn:aws:elasticloadbalancing:us-east-2:938106001005:targetgroup/k8s-cluster-from-ground-up/efebd9467b23cdad
+KUBERNETES_PUBLIC_ADDRESS=k8s-cluster-from-ground-up-d7aa8222ba1bd0d9.elb.us-east-2.amazonaws.com
+IMAGE_ID=ami-00afad98bfeb7fab3
+KUBERNETES_API_SERVER_ADDRESS=k8s-cluster-from-ground-up-d7aa8222ba1bd0d9.elb.us-east-2.amazonaws.com
+ETCD_ENCRYPTION_KEY=1aD2rYYiYcnuD+46LfpfPvysUrnmsU7PT/lDCxI9G6o=

@@ -152,18 +152,26 @@ Generate access keys and store them in a safe place.
 To configure your AWS CLI – run your shell (or cmd if using Windows) and run:
 
 ```
-aws configure --profile %your_username%
+aws configure --profile <your_username>
 AWS Access Key ID [None]: AKIAIOSFODNN7EXAMPLE
 AWS Secret Access Key [None]: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
 Default region name [None]: us-west-2
 Default output format [None]: json
 ```
-aws configure --profile %onyi%
+aws configure --profile onyeka
 
 Test your AWS CLI by running:
 
 ```
 aws ec2 describe-vpcs
+
+aws ec2 describe-vpcs --profile onyeka
+
+# Or to set the profile permanently to onyeka
+export AWS_PROFILE=onyeka
+# To switch back to the default profile:
+export AWS_PROFILE=default
+
 ```
 
 and check if you can see VPC details.
@@ -183,7 +191,7 @@ Because I had already installed on my windows system, my wsl ubuntu can pick it 
 Download the binary
 
 ```
-wget https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kubectl
+wget https://storage.googleapis.com/kubernetes-release/release/v1.31.0/bin/linux/amd64/kubectl
 ```
 
 Make it executable
@@ -198,7 +206,7 @@ Move to the Bin directory
 sudo mv kubectl /usr/local/bin/
 ```
 
-Verify that kubectl version 1.21.0 or higher is installed:
+Verify that kubectl version 1.31.0 or higher is installed:
 
 ```
 kubectl version --client
@@ -206,10 +214,11 @@ kubectl version --client
 
 Output:
 ```
-    Client Version: version.Info{Major:"1", Minor:"20+", GitVersion:"v1.20.4-dirty", GitCommit:"e87da0bd6e03ec3fea7933c4b5263d151aafd07c", GitTreeState:"dirty", BuildDate:"2021-03-15T10:03:32Z", GoVersion:"go1.16.2", Compiler:"gc", Platform:"darwin/amd64"}
+Client Version: v1.31.0
+Kustomize Version: v5.4.2
 ```
 
-#### Install CFSSL and CFSSLJSON-linux
+#### Install CFSSL and CFSSLJSON on Linux
 
 cfssl is an open source tool by Cloudflare used to setup a Public Key Infrastructure (PKI Infrastructure) for generating, signing and bundling TLS certificates. In previous projects you have experienced the use of Letsencrypt for the similar use case. Here, cfssl will be configured as a Certificate Authority which will issue the certificates required to spin up a Kubernetes cluster.
 
@@ -239,7 +248,7 @@ Revision: dev
 Runtime: go1.6
 ```
 
-#### Install CFSSL and CFSSLJSON-mac
+#### Install CFSSL and CFSSLJSON on Mac
 
 ```
 curl -o cfssl https://pkg.cfssl.org/R1.2/cfssl_linux-amd64 
@@ -558,9 +567,6 @@ IMAGE_ID=$(aws ec2 describe-images --owners 099720109477 \
   'Name=name,Values=ubuntu-pro-server/images/hvm-ssd/ubuntu-xenial-16.04-amd64-pro-server-20221202' \
   | jq -r '.Images|sort_by(.Name)[-1]|.ImageId')
 ```
-ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-*
-
-ubuntu-pro-server/images/hvm-ssd/ubuntu-xenial-16.04-amd64-pro-server-20221202
 
 ### SSH key-pair
 
@@ -1249,7 +1255,7 @@ Open up the kubeconfig files generated and review the 3 different sections that 
 - Credentials
 - And Kube Context
 
-Kubeconfig file is used to organize information about clusters, users, namespaces and authentication mechanisms. By default, kubectl looks for a file named **config** in the $HOME/.kube directory. You can specify other kubeconfig files by setting the KUBECONFIG environment variable or by setting the --kubeconfig flag. To get to know more how to create your own kubeconfig files – read this documentation - https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/.
+Kubeconfig file is used to organize information about clusters, users, namespaces and authentication mechanisms. By default, kubectl looks for a file named **config** in the $HOME/.kube directory. You can specify other kubeconfig files by setting the KUBECONFIG environment variable or by setting the --kubeconfig flag. To get to know more how to create your own kubeconfig files – read this [documentation](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/).
 
 Context part of kubeconfig file defines three main parameters: cluster, namespace and user. You can save several different contexts with any convenient names and switch between them when needed.
 
@@ -1995,7 +2001,7 @@ The following components will be installed on each node:
 
 - Dockershim was a temporary solution proposed by the Kubernetes community to add support for Docker so that it could serve as its container runtime. You should always remember that Kubernetes can use different container runtime to run containers inside its pods. For many years, Docker has been adopted widely and has been used as the container runtime for kubernetes. Hence the implementation that allowed docker is called the Dockershim. If you check the source code of Dockershim, you will see that socat was used to implement the port-forwarding functionality.
 
-- conntrack Connection tracking (“conntrack”) is a core feature of the Linux kernel’s networking stack. It allows the kernel to keep track of all logical network connections or flows, and thereby identify all of the packets which make up each flow so they can be handled consistently together. It is essential for performant complex networking of Kubernetes where nodes need to track connection information between thousands of pods and services.
+- conntrack Connection tracking (“conntrack”) is a core feature of the Linux kernel’s networking stack. It allows the kernel to keep track of all logical network connections or flows, and thereby identify all of the packets which make up each flow so they can be handled consistently together. It is essential for performing complex networking of Kubernetes where nodes need to track connection information between thousands of pods and services.
 
 - ipset is an extension to iptables which is used to configure firewall rules on a Linux server. ipset is a module extension to iptables that allows firewall configuration on a "set" of IP addresses. Compared with how iptables does the configuration linearly, ipset is able to store sets of addresses and index the data structure, making lookups very efficient, even when dealing with large sets. Kubernetes uses ipsets to implement a distributed firewall solution that enforces network policies within the cluster. This can then help to further restrict communications across pods or namespaces. For example, if a namespace is configured with DefaultDeny isolation type (Meaning no connection is allowed to the namespace from another namespace), network policies can be configured in the namespace to whitelist the traffic to the pods in that namespace.
 
@@ -2159,8 +2165,6 @@ Click to read more about each of the network plugins below:
 - Weave Net
 - flannel
 
-source
-
 Sometimes you can combine more than one plugin together to maximize the use of features from different providers. Or simply use a CNI network provider such as canal that gives you the best of Flannel and Calico.
 
 7. Download binaries for kubectl, kube-proxy, and kubelet
@@ -2226,11 +2230,9 @@ Network configuration will look like this:
 
 Notice, that both containers share a single virtual network interface veth0 that belongs to a virtual network within a single node. This virtual interface veth0 is used to allow communication from a pod to the outer world through a bridge cbr0 (custom bridge). This bridge is an interface that forwards the traffic from the Pods on one node to other nodes through a physical network interface eth0. Routing between the nodes is done by means of a router with the routing table.
 
-For more detailed explanation of different aspects of Kubernetes networking – watch this video.
-
 Pod Network
 
-You must decide on the Pod CIDR per worker node. Each worker node will run multiple pods, and each pod will have its own IP address. IP address of a particular Pod on worker node 1 should be able to communicate with the IP address of another particular Pod on worker node 2. For this to become possible, there must be a bridge network with virtual network interfaces that connects them all together. Here is an interesting read that goes a little deeper into how it works Bookmark that page and read it over and over again after you have completed this project
+You must decide on the Pod CIDR per worker node. Each worker node will run multiple pods, and each pod will have its own IP address. IP address of a particular Pod on worker node 1 should be able to communicate with the IP address of another particular Pod on worker node 2. For this to become possible, there must be a bridge network with virtual network interfaces that connects them all together.
 
 10. Configure the bridge and loopback networks
 Bridge:
@@ -2454,7 +2456,7 @@ Troubleshooting Tips: If you have issues at this point. Consider the below:
 
 1. Use journalctl -u {service name} to get the log output and read what might be wrong with starting up the service. You can redirect the output into a file and analyse it.
 
-2. Review your PKI setup again. Ensure that the certificates you generated have the hostnames properly configured.
+2. Review your PKI (public key infrastructure) setup again. Ensure that the certificates you generated have the hostnames properly configured.
 
 Congratulations!
 
